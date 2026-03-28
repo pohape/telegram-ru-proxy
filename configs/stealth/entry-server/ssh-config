@@ -1,0 +1,10 @@
+# ~/.ssh/config на entry-сервере
+# Замените значения на свои
+
+Host exit-server
+    HostName <EXIT_SERVER_IP>
+    User <USER>
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+    ServerAliveInterval 30
+    ServerAliveCountMax 3

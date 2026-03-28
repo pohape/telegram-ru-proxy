@@ -1,0 +1,14 @@
+# MTProto Proxy с маскировкой (exit-сервер)
+# Слушает только на localhost — доступ снаружи только через SSH-туннель
+# Не-MTProto подключения (браузер, проверка РКН) перенаправляются на nginx
+
+# Замените на свой домен entry-сервера:
+#   mtg generate-secret your-entry-server.example.com
+secret = "YOUR_SECRET_HERE"
+
+bind-to = "127.0.0.1:3443"
+
+# Domain fronting: не-MTProto подключения уходят на локальный nginx
+[domain-fronting]
+ip = "127.0.0.1"
+port = 8080
