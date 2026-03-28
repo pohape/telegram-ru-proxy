@@ -1,0 +1,8 @@
+# MTProto Proxy конфигурация (exit-server / Франкфурт)
+# Слушает только на localhost — доступ снаружи только через SSH-туннель
+
+# Сгенерировать свой секрет: mtg generate-secret google.com
+secret = "YOUR_SECRET_HERE"
+
+# Привязка только к localhost
+bind-to = "127.0.0.1:8443"
