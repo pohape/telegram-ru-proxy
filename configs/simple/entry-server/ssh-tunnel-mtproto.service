@@ -5,8 +5,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+# Замените user1 на вашего пользователя
 User=user1
 AmbientCapabilities=CAP_NET_BIND_SERVICE
+# Замените exit-server на имя хоста из ~/.ssh/config
 ExecStart=/usr/bin/autossh -M 0 -N \
     -o ServerAliveInterval=30 \
     -o ServerAliveCountMax=3 \

@@ -1,5 +1,5 @@
-# ~/.ssh/config на entry-server
-# Подключение к exit-server для SSH-туннеля
+# ~/.ssh/config на entry-сервере
+# Замените значения на свои
 
 Host exit-server
     HostName <EXIT_SERVER_IP>
