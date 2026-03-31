@@ -1,0 +1,13 @@
+[Unit]
+Description=MTProto Proxy (Python)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/mtprotoproxy
+ExecStart=/usr/bin/python3 /opt/mtprotoproxy/mtprotoproxy.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

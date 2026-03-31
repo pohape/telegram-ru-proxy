@@ -1,10 +1,11 @@
 [Unit]
-Description=MTProto Proxy with domain fronting
+Description=MTProto Proxy (Python)
 After=network.target nginx.service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/mtg run /etc/mtg.toml
+WorkingDirectory=/opt/mtprotoproxy
+ExecStart=/usr/bin/python3 /opt/mtprotoproxy/mtprotoproxy.py
 Restart=always
 RestartSec=3
 

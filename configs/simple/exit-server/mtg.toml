@@ -1,9 +1,0 @@
-# MTProto Proxy конфигурация (exit-server / Франкфурт)
-# Слушает только на localhost — доступ снаружи только через SSH-туннель
-
-# Замените на свой домен entry-сервера:
-#   mtg generate-secret your-entry-server.example.com
-secret = "YOUR_SECRET_HERE"
-
-# Привязка только к localhost
-bind-to = "127.0.0.1:8443"
