@@ -320,11 +320,64 @@ sudo systemctl restart mtprotoproxy
 | Перезагрузка exit-сервера | mtprotoproxy стартует автоматически. autossh на entry переподключится в течение 30 сек |
 | Оба сервера одновременно | Каждый поднимет свои сервисы. autossh будет пытаться подключиться пока exit-сервер не станет доступен |
 
+## Мониторинг
+
+В комплекте идёт скрипт `check_mtproto_proxy.py`, который проверяет работоспособность прокси end-to-end: подключается к Telegram через прокси как настоящий клиент (через [Telethon](https://github.com/LonamiWebs/Telethon)) и выполняет MTProto handshake. Это не просто проверка порта — скрипт выявляет проблемы, при которых порт отвечает, сайт-заглушка открывается, но Telegram через прокси не работает.
+
+### Установка зависимостей
+
+```bash
+pip install telethon pysocks
+```
+
+### Использование
+
+```bash
+python3 check_mtproto_proxy.py \
+    --tg-api-id <ваш_api_id> \
+    --tg-api-hash <ваш_api_hash> \
+    "tg://proxy?server=...&port=...&secret=..."
+```
+
+`--tg-api-id` и `--tg-api-hash` можно заменить переменными окружения `TG_API_ID` и `TG_API_HASH` — удобно для cron и мониторинга. Получить их можно на https://my.telegram.org (API development tools).
+
+На вход принимает `tg://proxy` ссылку целиком — ту же, что раздаётся пользователям.
+
+### Возвращаемые значения
+
+| Результат | stdout | exit code |
+|-----------|--------|-----------|
+| Прокси работает | `OK` | `0` |
+| Таймаут подключения | `Таймаут 15с через server:port` | `1` |
+| Ошибка MTProto handshake | `Ошибка через server:port: ...` | `1` |
+| Не заданы credentials | `Не заданы TG_API_ID и TG_API_HASH` | `1` |
+
+### Интеграция с мониторингом
+
+Скрипт спроектирован для использования с [self-hosted-tg-alerts-uptime-monitor](https://github.com/pohape/self-hosted-tg-alerts-uptime-monitor) — self-hosted системой мониторинга с уведомлениями в Telegram. Она умеет мониторить сайты (HTTP/HTTPS), выполнять shell-команды, проверять SSL-сертификаты, отправлять алерты при падении и уведомления при восстановлении, а также генерировать периодические отчёты.
+
+Пример конфигурации в `config.yaml`:
+
+```yaml
+commands:
+  mtproto_proxy_1:
+    command: "python3 /path/to/check_mtproto_proxy.py --tg-api-id 12345 --tg-api-hash abc123 'tg://proxy?server=your-server.example.com&port=443&secret=YOUR_SECRET'"
+    search_string: "OK"
+    timeout: 20
+    schedule: '*/5 * * * *'
+    tg_chats_to_notify:
+      - 123456789
+    notify_after_attempt: 2
+```
+
+При падении прокси вы получите уведомление в Telegram, а при восстановлении — уведомление о восстановлении с указанием длительности даунтайма.
+
 ## Структура проекта
 
 ```
 telegram-ru-proxy/
 ├── README.md
+├── check_mtproto_proxy.py           # Скрипт мониторинга (end-to-end проверка)
 └── configs/
     ├── simple/                          # Способ 1: простой
     │   ├── entry-server/
