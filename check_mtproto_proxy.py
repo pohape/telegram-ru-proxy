@@ -20,7 +20,7 @@ import asyncio
 import base64
 import logging
 from urllib.parse import urlparse, parse_qs
-from telethon import TelegramClient
+from telethon import TelegramClient, functions
 from telethon.network import ConnectionTcpMTProxyRandomizedIntermediate
 
 logging.disable(logging.CRITICAL)
@@ -60,11 +60,14 @@ async def check_proxy(server, port, dd_secret, api_id, api_hash):
 
     try:
         await asyncio.wait_for(client.connect(), timeout=TIMEOUT)
-        if client.is_connected():
-            await client.disconnect()
-            return True, "OK"
-        else:
+        if not client.is_connected():
             return False, f"Не удалось подключиться через {server}:{port}"
+        # Реальный API-вызов к Telegram (не требует авторизации)
+        result = await asyncio.wait_for(
+            client(functions.help.GetNearestDcRequest()), timeout=TIMEOUT
+        )
+        await client.disconnect()
+        return True, "OK"
     except asyncio.TimeoutError:
         return False, f"Таймаут {TIMEOUT}с через {server}:{port}"
     except Exception as e:
@@ -87,8 +90,12 @@ def main():
         print("Не заданы --tg-api-id и --tg-api-hash (или TG_API_ID/TG_API_HASH)")
         sys.exit(1)
 
-    server, port, secret_b64 = parse_tg_link(args.tg_link)
-    dd_secret = secret_to_dd(secret_b64)
+    try:
+        server, port, secret_b64 = parse_tg_link(args.tg_link)
+        dd_secret = secret_to_dd(secret_b64)
+    except Exception as e:
+        print(f"Неверная ссылка: {e}")
+        sys.exit(1)
 
     ok, msg = asyncio.run(check_proxy(server, port, dd_secret, int(args.tg_api_id), args.tg_api_hash))
     print(msg)
