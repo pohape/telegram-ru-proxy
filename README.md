@@ -54,7 +54,7 @@ MTProto Proxy с режимом fake TLS дополнительно маскир
 
 ### Шаг 0а. Открыть порты на хостинге
 
-**Это критичный шаг — без него certbot в шаге 5 не сработает.** Откройте в панели управления хостингом на **entry-сервере**:
+**Это критичный шаг — без него certbot в шаге 4 не сработает.** Откройте в панели управления хостингом на **entry-сервере**:
 
 - **443/TCP** — для клиентов Telegram и HTTPS
 - **80/TCP** — для выпуска и продления сертификата Let's Encrypt
@@ -63,7 +63,23 @@ MTProto Proxy с режимом fake TLS дополнительно маскир
 
 > **Cloud.ru:** по умолчанию все входящие порты закрыты. В веб-интерфейсе перейдите в раздел «Группы безопасности», создайте новую группу и добавьте правила входящего трафика (ingress) для портов **443/TCP** и **80/TCP** с источником `0.0.0.0/0`. Затем привяжите эту группу к виртуальной машине. Применение правил может занять несколько минут.
 
-### Шаг 0б. Клонировать репозиторий на оба сервера
+### Шаг 0б. Установить зависимости
+
+На каждом сервере установите пакеты. Наборы разные: на entry-сервере всё для туннеля и выпуска сертификата, на exit-сервере — только `git` и `nginx` (остальное притащится в шаге 10 — туда mtg скачивается как бинарник, не через apt).
+
+**На entry-сервере:**
+```bash
+apt-get update
+apt-get install -y git certbot autossh dnsutils
+```
+
+**На exit-сервере:**
+```bash
+apt-get update
+apt-get install -y git nginx
+```
+
+### Шаг 0в. Клонировать репозиторий на оба сервера
 
 Все конфиги нужны на каждом сервере. Клонируйте в `/opt`:
 
@@ -121,16 +137,7 @@ ssh exit-server hostname
 
 Должно вывести hostname exit-сервера без запроса пароля.
 
-### Шаг 4. Установить certbot и autossh
-
-```bash
-apt-get update
-apt-get install -y certbot autossh dnsutils
-```
-
-`dnsutils` нужен только ради `dig` в шаге 5 — если он вам не нужен, можно не ставить.
-
-### Шаг 5. Выпустить SSL-сертификат Let's Encrypt
+### Шаг 4. Выпустить SSL-сертификат Let's Encrypt
 
 Порт **80** должен быть открыт (см. Шаг 0а) и свободен — никакие веб-серверы не должны висеть на нём.
 
@@ -150,7 +157,7 @@ certbot certonly --standalone -d your-entry-server.example.com \
 
 Замените `your-entry-server.example.com` и email на свои. После успешного выпуска сертификат окажется в `/etc/letsencrypt/live/your-entry-server.example.com/`.
 
-### Шаг 6. Скопировать сертификат на exit-сервер
+### Шаг 5. Скопировать сертификат на exit-сервер
 
 ```bash
 DOMAIN=your-entry-server.example.com   # ← замените на ваш домен
@@ -159,7 +166,7 @@ scp /etc/letsencrypt/live/$DOMAIN/privkey.pem exit-server:/etc/ssl/entry-server_
 ssh exit-server "chmod 600 /etc/ssl/entry-server_privkey.pem"
 ```
 
-### Шаг 7. Настроить автопродление сертификата
+### Шаг 6. Настроить автопродление сертификата
 
 ```bash
 cp /opt/telegram-ru-proxy/configs/entry-server/renew-cert.sh /usr/local/bin/renew-cert.sh
@@ -179,7 +186,7 @@ echo '0 3 1 */2 * root /usr/local/bin/renew-cert.sh >> /var/log/renew-cert.log 2
     | tee /etc/cron.d/renew-cert > /dev/null
 ```
 
-### Шаг 8. Настроить SSH-туннель через systemd
+### Шаг 7. Настроить SSH-туннель через systemd
 
 ```bash
 cp /opt/telegram-ru-proxy/configs/entry-server/ssh-tunnel-mtproto.service \
@@ -204,7 +211,7 @@ systemctl status ssh-tunnel-mtproto
 ss -tlnp | grep ':443 '
 ```
 
-> На этом этапе туннель стоит, но на exit-сервере ещё не настроен mtg (это шаги 9–15). Если сейчас откроете `https://your-entry-server.example.com` в браузере — получите ошибку «connection reset». Это нормально, всё заработает после настройки nginx+mtg в шагах 9–15.
+> На этом этапе туннель стоит, но на exit-сервере ещё не настроен mtg (это шаги 8–13). Если сейчас откроете `https://your-entry-server.example.com` в браузере — получите ошибку «connection reset». Это нормально, всё заработает после настройки nginx+mtg в шагах 8–13.
 
 ---
 
@@ -217,14 +224,7 @@ ss -tlnp | grep ':443 '
 ssh exit-server
 ```
 
-### Шаг 9. Установить nginx
-
-```bash
-apt-get update
-apt-get install -y nginx
-```
-
-### Шаг 10. Разместить сайт-заглушку
+### Шаг 8. Разместить сайт-заглушку
 
 В репо лежит готовый шаблон. Скопируйте его:
 
@@ -234,14 +234,14 @@ cp /opt/telegram-ru-proxy/configs/exit-server/index.html /var/www/html/index.htm
 
 Откройте `/var/www/html/index.html` и отредактируйте содержимое — замените заголовок «Мои любимые рецепты» и сами рецепты на что-нибудь ваше. Главное чтобы сайт выглядел как настоящий личный блог/визитка, а не как свежий сервер с `It works!`.
 
-### Шаг 11. Настроить nginx vhost
+### Шаг 9. Настроить nginx vhost
 
 ```bash
 cp /opt/telegram-ru-proxy/configs/exit-server/nginx-fallback.conf \
     /etc/nginx/sites-available/fallback
 ```
 
-Откройте `/etc/nginx/sites-available/fallback` и замените **только `server_name`** на ваш домен. Пути к сертификатам в шаблоне (`/etc/ssl/entry-server_fullchain.pem` и `/etc/ssl/entry-server_privkey.pem`) уже совпадают с тем, куда вы скопировали их в шаге 6 — менять не надо.
+Откройте `/etc/nginx/sites-available/fallback` и замените **только `server_name`** на ваш домен. Пути к сертификатам в шаблоне (`/etc/ssl/entry-server_fullchain.pem` и `/etc/ssl/entry-server_privkey.pem`) уже совпадают с тем, куда вы скопировали их в шаге 5 — менять не надо.
 
 ```bash
 ln -sf /etc/nginx/sites-available/fallback /etc/nginx/sites-enabled/
@@ -250,9 +250,9 @@ systemctl reload nginx
 systemctl enable nginx
 ```
 
-`nginx -t` должен вернуть «syntax is ok» — если ругается на отсутствующий сертификат, значит вы пропустили шаг 6.
+`nginx -t` должен вернуть «syntax is ok» — если ругается на отсутствующий сертификат, значит вы пропустили шаг 5.
 
-### Шаг 12. Установить mtg
+### Шаг 10. Установить mtg
 
 Скачайте последний релиз [mtg](https://github.com/9seconds/mtg/releases) под Linux amd64:
 
@@ -266,7 +266,7 @@ chmod +x /usr/local/bin/mtg
 mtg --version
 ```
 
-### Шаг 13. Сгенерировать секрет
+### Шаг 11. Сгенерировать секрет
 
 ```bash
 mtg generate-secret your-entry-server.example.com
@@ -276,17 +276,17 @@ mtg generate-secret your-entry-server.example.com
 
 > Всегда подставляйте в `generate-secret` **домен вашего entry-сервера**, а не чужой (`google.com` и подобные). Домен зашит внутри секрета и используется как SNI при TLS-подключении. Если SNI = `google.com`, а IP-адрес сервера принадлежит Cloud.ru или Beget — DPI это легко палит.
 
-### Шаг 14. Настроить mtg
+### Шаг 12. Настроить mtg
 
 ```bash
 cp /opt/telegram-ru-proxy/configs/exit-server/mtg.toml /etc/mtg.toml
 ```
 
-Откройте `/etc/mtg.toml` и замените `YOUR_SECRET_HERE` на секрет из шага 13.
+Откройте `/etc/mtg.toml` и замените `YOUR_SECRET_HERE` на секрет из шага 11.
 
 В конфиге также настроена секция `[domain-fronting]` с `ip = "127.0.0.1"` и `port = 8080` — это заставляет mtg отправлять не-MTProto подключения на локальный nginx (иначе mtg резолвит домен из секрета через DNS, попадает обратно на entry-сервер — получается петля).
 
-### Шаг 15. Запустить mtg через systemd
+### Шаг 13. Запустить mtg через systemd
 
 ```bash
 cp /opt/telegram-ru-proxy/configs/exit-server/mtg.service /etc/systemd/system/mtg.service
