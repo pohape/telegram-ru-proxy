@@ -322,48 +322,65 @@ sudo systemctl restart mtprotoproxy
 
 ## Мониторинг
 
-В комплекте идёт скрипт `check_mtproto_proxy.py`, который проверяет работоспособность прокси end-to-end: подключается к Telegram через прокси как настоящий клиент (через [Telethon](https://github.com/LonamiWebs/Telethon)) и выполняет MTProto handshake. Это не просто проверка порта — скрипт выявляет проблемы, при которых порт отвечает, сайт-заглушка открывается, но Telegram через прокси не работает.
+В комплекте идёт скрипт `check_mtproto_proxy.py` — глубокая проверка MTProto-прокси, которая подтверждает, что сервер действительно обслуживает FakeTLS MTProto-клиентов, а не просто принимает TCP-соединения. Именно такую проверку не получается сделать простым `curl`-ом: страница-заглушка может открываться, TCP-порт отвечать, но Telegram при этом не работать (например, когда прокси по какой-то причине отправляет все подключения на fallback-сайт вместо MTProto).
 
-### Установка зависимостей
+### Что именно проверяет
 
-```bash
-pip install telethon pysocks
-```
+Скрипт выполняет настоящий FakeTLS handshake, как это делает Telegram-клиент:
+
+1. Формирует TLS 1.3 ClientHello со структурой, которую ждёт mtg / mtprotoproxy (длина ≥ 517 байт, TLS record version `0x0301`, SNI с доменом из секрета).
+2. Вычисляет 32-байтный `HMAC-SHA256(секрет, ClientHello с зануленным random-полем)`, XOR-ит последние 4 байта с текущим unix-временем и подставляет результат в поле random.
+3. Отправляет ClientHello на сервер и читает ответ.
+4. Извлекает из ответа 32-байтный серверный digest (поле `random` в ServerHello).
+5. Вычисляет ожидаемое значение: `HMAC-SHA256(секрет, клиентский_digest + ServerHello_с_зануленным_digest)`.
+6. Сравнивает. Совпадение = сервер знает секрет и корректно обслужил MTProto-клиента. Несовпадение = запрос ушёл в domain fronting (fallback), то есть прокси не узнал клиента.
+
+За счёт HMAC-проверки скрипт отличает работающий MTProto-проксик от «мёртвого» прокси, который просто показывает сайт-заглушку любому входящему.
+
+### Совместимость
+
+- ✅ **mtg** (FakeTLS mode) — единственный режим, который поддерживает mtg
+- ✅ **mtprotoproxy** с `tls: True` в `config.py`
+- ❌ Старые режимы (`classic`, `secure`/dd-secret) — у FakeTLS-проверки другая логика handshake
+
+### Зависимости
+
+Только стандартная библиотека Python 3 (`hmac`, `hashlib`, `socket`, `struct`, `secrets`, `base64`, `urllib`, `argparse`). Никаких `pip install` не требуется, не нужно `api_id`/`api_hash` и аккаунт Telegram.
 
 ### Использование
 
 ```bash
-python3 check_mtproto_proxy.py \
-    --tg-api-id <ваш_api_id> \
-    --tg-api-hash <ваш_api_hash> \
-    "tg://proxy?server=...&port=...&secret=..."
+python3 check_mtproto_proxy.py "tg://proxy?server=...&port=...&secret=..."
 ```
 
-`--tg-api-id` и `--tg-api-hash` можно заменить переменными окружения `TG_API_ID` и `TG_API_HASH` — удобно для cron и мониторинга. Получить их можно на https://my.telegram.org (API development tools).
+Скрипт принимает полную `tg://proxy` ссылку — ту же, что раздаётся пользователям. Секрет распознаётся в любом из трёх форматов:
 
-На вход принимает `tg://proxy` ссылку целиком — ту же, что раздаётся пользователям.
+- **hex:** `ee<32 hex>...` (напр. `ee418622effe42a41b1ff4a28341079a6e68656c6c6f64656e69732e7275`)
+- **base64:** стандартный с `+` и `/`
+- **base64 url-safe:** с `-` и `_`
 
 ### Возвращаемые значения
 
 | Результат | stdout | exit code |
 |-----------|--------|-----------|
-| Прокси работает | `OK` | `0` |
-| Таймаут подключения | `Таймаут 15с через server:port` | `1` |
-| Ошибка MTProto handshake | `Ошибка через server:port: ...` | `1` |
-| Не заданы credentials | `Не заданы TG_API_ID и TG_API_HASH` | `1` |
+| Прокси работает (HMAC совпал) | `OK` | `0` |
+| Прокси не узнал секрет (ушёл в fallback) | `Server response digest does not match expected HMAC — proxy did NOT recognize the secret (routed to domain fronting fallback)` | `1` |
+| TCP/SSL не прошли | `TCP connect failed to server:port: ...` / `TCP connect timeout` | `1` |
+| Сервер закрыл соединение | `Server closed connection after ClientHello` | `1` |
+| Сломанный секрет | `Invalid secret: ...` | `1` |
 
 ### Интеграция с мониторингом
 
-Скрипт спроектирован для использования с [self-hosted-tg-alerts-uptime-monitor](https://github.com/pohape/self-hosted-tg-alerts-uptime-monitor) — self-hosted системой мониторинга с уведомлениями в Telegram. Она умеет мониторить сайты (HTTP/HTTPS), выполнять shell-команды, проверять SSL-сертификаты, отправлять алерты при падении и уведомления при восстановлении, а также генерировать периодические отчёты.
+Скрипт спроектирован для использования с [self-hosted-tg-alerts-uptime-monitor](https://github.com/pohape/self-hosted-tg-alerts-uptime-monitor) — self-hosted системой мониторинга с уведомлениями в Telegram. Она умеет мониторить сайты, выполнять shell-команды, проверять SSL-сертификаты, отправлять алерты при падении и уведомления при восстановлении, а также генерировать периодические отчёты.
 
 Пример конфигурации в `config.yaml`:
 
 ```yaml
 commands:
   mtproto_proxy_1:
-    command: "python3 /path/to/check_mtproto_proxy.py --tg-api-id 12345 --tg-api-hash abc123 'tg://proxy?server=your-server.example.com&port=443&secret=YOUR_SECRET'"
+    command: "python3 /path/to/check_mtproto_proxy.py 'tg://proxy?server=your-server.example.com&port=443&secret=YOUR_SECRET'"
     search_string: "OK"
-    timeout: 20
+    timeout: 15
     schedule: '*/5 * * * *'
     tg_chats_to_notify:
       - 123456789
@@ -371,6 +388,8 @@ commands:
 ```
 
 При падении прокси вы получите уведомление в Telegram, а при восстановлении — уведомление о восстановлении с указанием длительности даунтайма.
+
+> 🇷🇺 Если мониторинг крутится в России и провайдер блокирует `api.telegram.org` — настройте в монитор-тулзе опцию `telegram_proxy` (SOCKS5 через SSH-туннель). См. его README, секция «Telegram Proxy».
 
 ## Структура проекта
 
