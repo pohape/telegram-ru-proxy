@@ -9,8 +9,8 @@
 #   EXIT_IP — IP exit-сервера
 
 DOMAIN="your-entry-server.example.com"
-SSH_KEY="/home/user1/.ssh/id_ed25519"
-EXIT_USER="ubuntu"
+SSH_KEY="/root/.ssh/id_ed25519"
+EXIT_USER="root"
 EXIT_IP="<EXIT_SERVER_IP>"
 
 # Продление (certbot останавливает туннель чтобы занять порт 80)
@@ -19,10 +19,8 @@ certbot renew --quiet --standalone \
     --post-hook "systemctl start ssh-tunnel-mtproto"
 
 # Копирование на exit-сервер
-scp -i "$SSH_KEY" "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" "$EXIT_USER@$EXIT_IP:/tmp/entry-server_fullchain.pem"
-scp -i "$SSH_KEY" "/etc/letsencrypt/live/$DOMAIN/privkey.pem" "$EXIT_USER@$EXIT_IP:/tmp/entry-server_privkey.pem"
+scp -i "$SSH_KEY" "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" "$EXIT_USER@$EXIT_IP:/etc/ssl/entry-server_fullchain.pem"
+scp -i "$SSH_KEY" "/etc/letsencrypt/live/$DOMAIN/privkey.pem" "$EXIT_USER@$EXIT_IP:/etc/ssl/entry-server_privkey.pem"
 ssh -i "$SSH_KEY" "$EXIT_USER@$EXIT_IP" "\
-    sudo mv /tmp/entry-server_fullchain.pem /etc/ssl/entry-server_fullchain.pem && \
-    sudo mv /tmp/entry-server_privkey.pem /etc/ssl/entry-server_privkey.pem && \
-    sudo chmod 600 /etc/ssl/entry-server_privkey.pem && \
-    sudo systemctl reload nginx"
+    chmod 600 /etc/ssl/entry-server_privkey.pem && \
+    systemctl reload nginx"

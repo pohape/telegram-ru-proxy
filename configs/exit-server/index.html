@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мои любимые рецепты</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #faf8f5; color: #333; line-height: 1.7; }
+        header { background: #fff; border-bottom: 2px solid #e8ddd3; padding: 2.5rem 0; text-align: center; }
+        .container { max-width: 780px; margin: 0 auto; padding: 0 1.5rem; }
+        h1 { font-size: 2rem; font-weight: 600; color: #5a3e2b; }
+        main { padding: 2rem 0; }
+        .recipe { background: #fff; border-radius: 10px; margin-bottom: 1rem; box-shadow: 0 2px 6px rgba(0,0,0,0.06); border-left: 4px solid #c9a96e; overflow: hidden; }
+        .recipe-header { padding: 1.2rem 2rem; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; transition: background 0.2s; }
+        .recipe-header:hover { background: #fdf6ee; }
+        .recipe-header h2 { font-size: 1.3rem; color: #5a3e2b; margin: 0; }
+        .recipe-chevron { width: 20px; height: 20px; flex-shrink: 0; margin-left: 1rem; transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1); color: #c9a96e; }
+        .recipe.open .recipe-chevron { transform: rotate(180deg); }
+        .recipe-body { overflow: hidden; transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1); height: 0; }
+        .recipe-body-inner { padding: 0 2rem 1.5rem; }
+        .recipe h3 { font-size: 0.9rem; margin: 1.2rem 0 0.5rem; color: #7a5c3e; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+        .recipe ul, .recipe ol { padding-left: 1.5rem; color: #495057; }
+        .recipe li { margin-bottom: 0.3rem; }
+        .recipe ol li { margin-bottom: 0.5rem; }
+        footer { text-align: center; padding: 2rem 0; color: #adb5bd; font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Мои любимые рецепты</h1>
+        </div>
+    </header>
+    <main>
+        <div class="container">
+
+            <div class="recipe">
+                <div class="recipe-header">
+                    <h2>Киш с курицей и грибами</h2>
+                    <svg class="recipe-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div class="recipe-body"><div class="recipe-body-inner">
+                    <h3>Тесто</h3>
+                    <ul>
+                        <li>200 г муки</li>
+                        <li>100 г сливочного масла (холодного)</li>
+                        <li>1 яйцо</li>
+                        <li>2 ст.л. ледяной воды</li>
+                        <li>Щепотка соли</li>
+                    </ul>
+                    <h3>Начинка</h3>
+                    <ul>
+                        <li>300 г куриного филе</li>
+                        <li>200 г шампиньонов</li>
+                        <li>1 луковица</li>
+                        <li>3 яйца</li>
+                        <li>200 мл сливок 20%</li>
+                        <li>100 г сыра</li>
+                        <li>Соль, перец по вкусу</li>
+                    </ul>
+                    <h3>Приготовление</h3>
+                    <ol>
+                        <li>Муку порубить с холодным маслом в крошку, добавить яйцо и воду, замесить тесто. Убрать в холодильник на 30 минут.</li>
+                        <li>Курицу нарезать кубиками и обжарить до золотистости. Отдельно обжарить нарезанные грибы с луком.</li>
+                        <li>Тесто раскатать и выложить в форму (26 см), сформировать бортики. Наколоть вилкой дно.</li>
+                        <li>Выложить курицу и грибы на тесто. Взбить яйца со сливками, посолить, поперчить, залить начинку. Сверху натереть сыр.</li>
+                        <li>Выпекать при 180°C 35-40 минут до золотистой корочки.</li>
+                    </ol>
+                </div></div>
+            </div>
+
+            <div class="recipe">
+                <div class="recipe-header">
+                    <h2>Пирог с луком и яйцом</h2>
+                    <svg class="recipe-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div class="recipe-body"><div class="recipe-body-inner">
+                    <h3>Тесто</h3>
+                    <ul>
+                        <li>300 г муки</li>
+                        <li>200 мл кефира</li>
+                        <li>1 яйцо</li>
+                        <li>50 г сливочного масла (растопленного)</li>
+                        <li>1 ч.л. разрыхлителя</li>
+                        <li>Щепотка соли</li>
+                    </ul>
+                    <h3>Начинка</h3>
+                    <ul>
+                        <li>6 варёных яиц</li>
+                        <li>4 пучка зелёного лука</li>
+                        <li>30 г сливочного масла</li>
+                        <li>Соль, перец по вкусу</li>
+                    </ul>
+                    <h3>Приготовление</h3>
+                    <ol>
+                        <li>Смешать кефир, яйцо, растопленное масло и соль. Добавить муку с разрыхлителем, замесить мягкое тесто.</li>
+                        <li>Яйца порубить, лук мелко нарезать, смешать с растопленным маслом, посолить и поперчить.</li>
+                        <li>Половину теста выложить в смазанную форму, сверху начинку, закрыть оставшимся тестом.</li>
+                        <li>Смазать верх взбитым яйцом. Выпекать при 180°C 30-35 минут.</li>
+                    </ol>
+                </div></div>
+            </div>
+
+            <div class="recipe">
+                <div class="recipe-header">
+                    <h2>Суп с фрикадельками</h2>
+                    <svg class="recipe-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div class="recipe-body"><div class="recipe-body-inner">
+                    <h3>Ингредиенты</h3>
+                    <ul>
+                        <li>400 г смешанного фарша (свинина + говядина)</li>
+                        <li>3 картофелины</li>
+                        <li>1 морковь</li>
+                        <li>1 луковица</li>
+                        <li>80 г вермишели</li>
+                        <li>2 л бульона или воды</li>
+                        <li>1 яйцо</li>
+                        <li>Лавровый лист, соль, перец</li>
+                        <li>Зелень для подачи</li>
+                    </ul>
+                    <h3>Приготовление</h3>
+                    <ol>
+                        <li>В фарш добавить яйцо, соль, перец, хорошо вымесить. Сформировать небольшие фрикадельки.</li>
+                        <li>Бульон довести до кипения, положить нарезанный кубиками картофель.</li>
+                        <li>Морковь натереть, лук мелко нарезать, обжарить на масле до мягкости. Добавить в суп.</li>
+                        <li>Аккуратно опустить фрикадельки в кипящий суп. Варить 15 минут.</li>
+                        <li>Добавить вермишель, лавровый лист, варить ещё 5 минут. Подавать с зеленью.</li>
+                    </ol>
+                </div></div>
+            </div>
+
+            <div class="recipe">
+                <div class="recipe-header">
+                    <h2>Блинчики с апельсиновым соусом</h2>
+                    <svg class="recipe-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div class="recipe-body"><div class="recipe-body-inner">
+                    <h3>Блинчики</h3>
+                    <ul>
+                        <li>250 г муки</li>
+                        <li>500 мл молока</li>
+                        <li>2 яйца</li>
+                        <li>2 ст.л. сахара</li>
+                        <li>2 ст.л. растительного масла</li>
+                        <li>Щепотка соли</li>
+                    </ul>
+                    <h3>Апельсиновый соус</h3>
+                    <ul>
+                        <li>3 апельсина (сок и цедра)</li>
+                        <li>50 г сливочного масла</li>
+                        <li>3 ст.л. сахара</li>
+                        <li>2 ст.л. ликёра или коньяка (по желанию)</li>
+                    </ul>
+                    <h3>Приготовление</h3>
+                    <ol>
+                        <li>Взбить яйца с сахаром и солью, влить молоко, постепенно добавить муку, размешать до однородности. Добавить масло. Дать тесту отдохнуть 20 минут.</li>
+                        <li>Выпечь тонкие блинчики на разогретой сковороде.</li>
+                        <li>Для соуса: растопить масло с сахаром, добавить цедру и сок апельсинов. Уварить на среднем огне 5-7 минут до загустения.</li>
+                        <li>Блинчики сложить треугольниками, выложить на тарелку и полить горячим апельсиновым соусом. По желанию фламбировать ликёром.</li>
+                    </ol>
+                </div></div>
+            </div>
+
+            <div class="recipe">
+                <div class="recipe-header">
+                    <h2>Говяжья вырезка</h2>
+                    <svg class="recipe-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div class="recipe-body"><div class="recipe-body-inner">
+                    <h3>Ингредиенты</h3>
+                    <ul>
+                        <li>800 г говяжьей вырезки</li>
+                        <li>2 ст.л. оливкового масла</li>
+                        <li>3 зубчика чеснока</li>
+                        <li>2 веточки розмарина</li>
+                        <li>50 г сливочного масла</li>
+                        <li>Соль крупная, перец чёрный</li>
+                    </ul>
+                    <h3>Приготовление</h3>
+                    <ol>
+                        <li>Мясо достать из холодильника за час до готовки. Обсушить, обильно натереть солью и перцем.</li>
+                        <li>На раскалённой сковороде с оливковым маслом обжарить вырезку со всех сторон до золотистой корочки (по 2 минуты на сторону).</li>
+                        <li>Добавить сливочное масло, чеснок и розмарин. Поливать мясо растопленным маслом 2 минуты.</li>
+                        <li>Переложить в духовку, разогретую до 200°C. Запекать 15-20 минут (medium rare). Внутренняя температура — 55°C.</li>
+                        <li>Дать мясу отдохнуть 10 минут под фольгой перед нарезкой.</li>
+                    </ol>
+                </div></div>
+            </div>
+
+            <div class="recipe">
+                <div class="recipe-header">
+                    <h2>Капуста в пиве</h2>
+                    <svg class="recipe-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div class="recipe-body"><div class="recipe-body-inner">
+                    <h3>Ингредиенты</h3>
+                    <ul>
+                        <li>1 кг белокочанной капусты</li>
+                        <li>330 мл тёмного пива</li>
+                        <li>2 луковицы</li>
+                        <li>2 ст.л. сливочного масла</li>
+                        <li>1 ст.л. сахара</li>
+                        <li>2 ст.л. яблочного уксуса</li>
+                        <li>Соль, тмин, лавровый лист</li>
+                    </ul>
+                    <h3>Приготовление</h3>
+                    <ol>
+                        <li>Капусту нашинковать, лук нарезать полукольцами.</li>
+                        <li>В глубокой сковороде или казане растопить масло, обжарить лук до прозрачности.</li>
+                        <li>Добавить капусту, сахар, перемешать. Тушить 10 минут.</li>
+                        <li>Влить пиво и уксус, добавить тмин и лавровый лист. Тушить под крышкой на медленном огне 40-50 минут, помешивая.</li>
+                        <li>Посолить по вкусу. Подавать как гарнир к мясу или сосискам.</li>
+                    </ol>
+                </div></div>
+            </div>
+
+            <div class="recipe">
+                <div class="recipe-header">
+                    <h2>Гречневая каша с овощами и курочкой</h2>
+                    <svg class="recipe-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div class="recipe-body"><div class="recipe-body-inner">
+                    <h3>Ингредиенты</h3>
+                    <ul>
+                        <li>300 г гречки</li>
+                        <li>400 г куриного филе</li>
+                        <li>1 морковь</li>
+                        <li>1 болгарский перец</li>
+                        <li>1 луковица</li>
+                        <li>2 зубчика чеснока</li>
+                        <li>2 ст.л. соевого соуса</li>
+                        <li>Растительное масло, соль, перец</li>
+                    </ul>
+                    <h3>Приготовление</h3>
+                    <ol>
+                        <li>Гречку промыть и отварить до готовности в подсоленной воде. Откинуть, дать стечь.</li>
+                        <li>Курицу нарезать небольшими кусочками, обжарить на сильном огне до золотистости.</li>
+                        <li>Лук, морковь и перец нарезать, добавить к курице. Обжаривать 5-7 минут.</li>
+                        <li>Добавить измельчённый чеснок и соевый соус, перемешать.</li>
+                        <li>Выложить гречку к овощам с курицей, хорошо перемешать и прогреть 3-5 минут.</li>
+                    </ol>
+                </div></div>
+            </div>
+
+            <div class="recipe">
+                <div class="recipe-header">
+                    <h2>Салат Новогодний с черносливом</h2>
+                    <svg class="recipe-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div class="recipe-body"><div class="recipe-body-inner">
+                    <h3>Ингредиенты</h3>
+                    <ul>
+                        <li>300 г куриного филе (отварного)</li>
+                        <li>150 г чернослива без косточки</li>
+                        <li>3 варёных яйца</li>
+                        <li>150 г сыра</li>
+                        <li>100 г грецких орехов</li>
+                        <li>2 зубчика чеснока</li>
+                        <li>Майонез для прослойки</li>
+                    </ul>
+                    <h3>Приготовление</h3>
+                    <ol>
+                        <li>Чернослив залить кипятком на 15 минут, затем нарезать соломкой.</li>
+                        <li>Курицу разобрать на волокна. Яйца натереть на крупной тёрке. Сыр натереть. Орехи порубить.</li>
+                        <li>Выкладывать слоями: курица, майонез, чернослив, яйца, майонез с чесноком, сыр, орехи.</li>
+                        <li>Убрать в холодильник минимум на 2 часа для пропитки.</li>
+                    </ol>
+                </div></div>
+            </div>
+
+            <div class="recipe">
+                <div class="recipe-header">
+                    <h2>Курочка по-министерски</h2>
+                    <svg class="recipe-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div class="recipe-body"><div class="recipe-body-inner">
+                    <h3>Ингредиенты</h3>
+                    <ul>
+                        <li>4 куриных филе</li>
+                        <li>3 луковицы</li>
+                        <li>200 г шампиньонов</li>
+                        <li>200 г сыра</li>
+                        <li>200 г майонеза</li>
+                        <li>Соль, перец, паприка</li>
+                    </ul>
+                    <h3>Приготовление</h3>
+                    <ol>
+                        <li>Филе разрезать вдоль на пластины, слегка отбить. Посолить, поперчить, посыпать паприкой.</li>
+                        <li>Лук нарезать полукольцами, грибы — пластинами.</li>
+                        <li>В смазанную форму выложить филе, сверху лук, затем грибы. Каждый слой слегка промазать майонезом.</li>
+                        <li>Сверху щедро засыпать натёртым сыром.</li>
+                        <li>Выпекать при 180°C 40-45 минут до золотистой сырной корочки.</li>
+                    </ol>
+                </div></div>
+            </div>
+
+        </div>
+    </main>
+    <footer>
+        <div class="container">&copy; 2026</div>
+    </footer>
+    <script>
+    document.querySelectorAll('.recipe-header').forEach(function(header) {
+        header.addEventListener('click', function() {
+            var recipe = this.parentElement;
+            var body = recipe.querySelector('.recipe-body');
+            var inner = body.querySelector('.recipe-body-inner');
+
+            if (recipe.classList.contains('open')) {
+                body.style.height = body.scrollHeight + 'px';
+                requestAnimationFrame(function() {
+                    body.style.height = '0';
+                });
+                recipe.classList.remove('open');
+            } else {
+                recipe.classList.add('open');
+                var h = inner.offsetHeight;
+                body.style.height = '0';
+                requestAnimationFrame(function() {
+                    body.style.height = h + 'px';
+                });
+                body.addEventListener('transitionend', function handler() {
+                    if (recipe.classList.contains('open')) {
+                        body.style.height = 'auto';
+                    }
+                    body.removeEventListener('transitionend', handler);
+                });
+            }
+        });
+    });
+    </script>
+</body>
+</html>

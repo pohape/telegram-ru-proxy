@@ -1,166 +1,24 @@
 # MTProto Proxy для Telegram через SSH-туннель
 
-MTProto Proxy для Telegram с двухсерверной схемой: entry-сервер в России принимает подключения клиентов, а exit-сервер за рубежом подключается к Telegram. Между серверами — SSH-туннель, который российские провайдеры не могут отличить от обычного SSH-трафика и замедлить.
+MTProto Proxy для Telegram с двухсерверной схемой: entry-сервер в России принимает подключения клиентов, а exit-сервер за рубежом подключается к Telegram. Между серверами — SSH-туннель, который не могут отличить от обычного SSH-трафика и замедлить.
 
 ## Зачем это нужно
 
-Российские провайдеры умеют распознавать и замедлять VPN-протоколы (WireGuard, OpenVPN) и прямые прокси-подключения с помощью DPI. SSH-трафик при этом не трогают — он неотличим от обычного администрирования серверов.
+РКН умеет распознавать и замедлять VPN-протоколы (WireGuard, OpenVPN) и прямые прокси-подключения с помощью DPI. SSH-трафик при этом не трогают — он неотличим от обычного администрирования серверов.
 
-MTProto Proxy с режимом fake TLS дополнительно маскирует трафик между Telegram-клиентом и entry-сервером под обычный HTTPS, что делает его невидимым для DPI.
+MTProto Proxy с режимом fake TLS дополнительно маскирует трафик между Telegram-клиентом и entry-сервером под обычный HTTPS. При открытии домена через браузер отображается настоящий сайт-заглушка — проверяющий увидит обычный личный сайт, а не ошибку.
 
-## Два способа установки
+В качестве MTProto-демона используется [**mtg**](https://github.com/9seconds/mtg). Выбран из-за активной разработки (релизы практически каждую неделю, регулярные фиксы против DPI-детекта) и встроенной поддержки FakeTLS + domain-fronting из одного бинарника.
 
-| | Простой | Stealth |
-|---|---------|---------|
-| **Сложность** | 15 минут | 30 минут |
-| **Компоненты на entry** | autossh | autossh, certbot, cron |
-| **Компоненты на exit** | mtprotoproxy | mtprotoproxy, nginx, TLS-сертификат |
-| **Маскировка** | fake TLS (SNI вашего домена) | fake TLS + реальный сайт на домене |
-| **Проверка РКН** | Браузер получит ошибку | Браузер увидит реальный сайт |
-| **Открытые порты на entry** | 443/TCP | 443/TCP, 80/TCP |
-| **Устойчивость к DPI** | Средняя | Высокая |
-| **Рекомендация** | Для личного использования | Для раздачи другим людям |
-
----
-
-## Общая часть: подготовка серверов
-
-### Выбор серверов
-
-**Entry-сервер (Россия):** рекомендуется [Cloud.ru](https://cloud.ru) — бесплатная VM, оплата только за публичный IP (~150 руб/мес). Минимальной конфигурации достаточно — entry-сервер только пробрасывает трафик.
-
-**Exit-сервер (за рубежом):** любой VPS в Европе. Например, [Tencent Cloud Lighthouse](https://www.tencentcloud.com/products/lighthouse) — 2 vCPU Linux VPS за ~$10/год (доступен Frankfurt). Минимальной конфигурации достаточно — mtprotoproxy потребляет мало ресурсов.
-
-### Требования
-
-- Два VPS: один в России (entry), один за рубежом (exit)
-- Ubuntu/Debian на обоих серверах
-- Домен, направленный на IP entry-сервера (A-запись)
-
-### 1. Настройка SSH-ключа (entry-сервер)
-
-```bash
-# На entry-сервере
-ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N '' -C 'entry->exit tunnel'
-
-# Скопировать публичный ключ на exit-сервер
-ssh-copy-id -i ~/.ssh/id_ed25519.pub user@<EXIT_SERVER_IP>
-```
-
-Настроить `~/.ssh/config` на entry-сервере (шаблон: `configs/*/entry-server/ssh-config`):
-
-```
-Host exit-server
-    HostName <EXIT_SERVER_IP>
-    User <USER>
-    IdentityFile ~/.ssh/id_ed25519
-    IdentitiesOnly yes
-    ServerAliveInterval 30
-    ServerAliveCountMax 3
-```
-
-Проверить: `ssh exit-server hostname`
-
-### 2. Установка mtprotoproxy (exit-сервер)
-
-```bash
-cd /opt
-sudo git clone https://github.com/alexbers/mtprotoproxy.git
-```
-
-### 3. Генерация секрета
-
-```bash
-# Сгенерировать 16-байтный hex-секрет
-python3 -c "import secrets; print(secrets.token_hex(16))"
-```
-
-Секрет для Telegram-ссылки формируется так: `ee` + hex-секрет + hex-кодировка домена:
-
-```bash
-# Пример для домена your-entry-server.example.com и секрета abcdef...
-echo -n "your-entry-server.example.com" | xxd -p
-# Результат: ссылка tg://proxy?server=...&port=443&secret=ee<секрет><hex-домен>
-```
-
-> Всегда используйте домен вашего entry-сервера. Это домен, который будет виден в SNI TLS-подключения. Использование чужих доменов (google.com и т.п.) — подозрительно для DPI, так как IP-адрес entry-сервера не соответствует домену.
-
-### 4. Установка autossh (entry-сервер)
-
-```bash
-sudo apt-get install -y autossh
-```
-
----
-
-## Способ 1: Простой
-
-Минимальная установка — только mtprotoproxy и SSH-туннель. При обращении к домену через браузер сайт не откроется (ошибка подключения).
-
-### Схема
+## Схема
 
 ```
 ┌──────────┐    fake TLS     ┌──────────────┐   SSH-туннель    ┌────────────────────┐          ┌──────────┐
 │ Telegram │ ──────────────> │ Entry-сервер │ ═══════════════> │    Exit-сервер     │ ───────> │ Telegram │
-│  клиент  │   :443          │   (Россия)   │  зашифрованный   │   (Франкфурт)      │          │ серверы  │
-└──────────┘                 │              │     канал        │ mtprotoproxy :8443 │          └──────────┘
-                             │  autossh     │                  │                    │
-                             └──────────────┘                  └────────────────────┘
-```
-
-**Что видит провайдер:**
-- Клиент → Entry: HTTPS-трафик к вашему домену (fake TLS)
-- Entry → Exit: обычный SSH-трафик
-
-### Конфигурация exit-сервера
-
-Скопировать `configs/simple/exit-server/config.py` в `/opt/mtprotoproxy/config.py`, вписать секрет и домен.
-
-Скопировать `configs/simple/exit-server/mtprotoproxy.service` в `/etc/systemd/system/mtprotoproxy.service`.
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now mtprotoproxy
-```
-
-### Конфигурация entry-сервера
-
-Скопировать `configs/simple/entry-server/ssh-tunnel-mtproto.service` в `/etc/systemd/system/ssh-tunnel-mtproto.service`. Заменить `User=user1` на вашего пользователя и `exit-server` на хост из SSH-конфига.
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now ssh-tunnel-mtproto
-```
-
-### Открыть порт
-
-Открыть **443/TCP** на entry-сервере в панели управления хостингом (security group, файрвол и т.д.).
-
-> **Cloud.ru:** по умолчанию все входящие порты закрыты. Необходимо в веб-интерфейсе перейти в раздел «Группы безопасности», создать новую группу и добавить правило входящего трафика (ingress) для порта **443/TCP** с источником `0.0.0.0/0`. Затем привязать эту группу к виртуальной машине. Применение правил может занять несколько минут.
-
-### Проверить
-
-```bash
-# С внешней машины
-nc -zv <ENTRY_SERVER_IP> 443
-# Connection succeeded = работает
-```
-
----
-
-## Способ 2: Stealth (с маскировкой под сайт)
-
-Полная маскировка — при обращении к домену через браузер открывается реальный сайт. MTProto-клиенты обслуживаются mtprotoproxy, остальные подключения перенаправляются на nginx с сайтом-заглушкой.
-
-### Схема
-
-```
-┌──────────┐    fake TLS     ┌──────────────┐   SSH-туннель    ┌────────────────────┐          ┌──────────┐
-│ Telegram │ ──────────────> │ Entry-сервер │ ═══════════════> │    Exit-сервер     │ ───────> │ Telegram │
-│  клиент  │   :443          │   (Россия)   │  зашифрованный   │ mtprotoproxy :3443 │          │ серверы  │
-└──────────┘                 │              │     канал        │        │           │          └──────────┘
-                             │  autossh     │                  │        ↓          │
-┌──────────┐    HTTPS        │              │                  │   nginx :8080      │
+│  клиент  │   :443          │   (Россия)   │  зашифрованный   │      mtg :3443     │          │ серверы  │
+└──────────┘                 │              │     канал        │         │          │          └──────────┘
+                             │  autossh     │                  │         \/         │
+┌──────────┐    HTTPS        │              │                  │    nginx :8080     │
 │ Браузер  │ ──────────────> │              │ ═══════════════> │   сайт-заглушка    │
 │   РКН    │   :443          │              │                  │                    │
 └──────────┘                 └──────────────┘                  └────────────────────┘
@@ -170,97 +28,295 @@ nc -zv <ENTRY_SERVER_IP> 443
 - Клиент → Entry: обычный HTTPS-трафик к вашему домену
 - Entry → Exit: обычный SSH-трафик
 
-**Что видит РКН при проверке:**
-- Реальный HTTPS-сайт с валидным сертификатом
+**Что видит РКН при проверке через браузер:**
+- Реальный HTTPS-сайт с валидным сертификатом Let's Encrypt
 
-### Конфигурация exit-сервера
+---
 
-#### nginx (сайт-заглушка)
+## Требования
+
+- Два VPS: один в России (entry), один за рубежом (exit)
+- Ubuntu/Debian на обоих серверах
+- Домен, направленный на IP entry-сервера (A-запись)
+- Открытые порты **443/TCP** и **80/TCP** на entry-сервере
+
+## Выбор серверов
+
+**Entry-сервер (Россия):** рекомендуется [Cloud.ru](https://cloud.ru) — бесплатная VPS, оплата только за публичный IP (~150 руб/мес). Минимальной конфигурации достаточно — entry-сервер только пробрасывает трафик.
+
+**Exit-сервер (за рубежом):** любой VPS в Европе. Например, [Tencent Cloud Lighthouse](https://www.tencentcloud.com/products/lighthouse) — 2 vCPU Linux VPS за ~$10/год (доступен Frankfurt). Минимальной конфигурации достаточно — mtg потребляет мало ресурсов (~10 МБ RAM).
+
+---
+
+## Установка
+
+Инструкция предполагает, что вы работаете **от root** или через `sudo`. Все команды выполняются в указанной последовательности — сначала весь entry-сервер, потом весь exit-сервер (нужно чтобы сертификат уже был выпущен к моменту настройки nginx/mtg).
+
+### Шаг 0а. Открыть порты на хостинге
+
+**Это критичный шаг — без него certbot в шаге 5 не сработает.** Откройте в панели управления хостингом на **entry-сервере**:
+
+- **443/TCP** — для клиентов Telegram и HTTPS
+- **80/TCP** — для выпуска и продления сертификата Let's Encrypt
+
+На exit-сервере дополнительных портов открывать не нужно — входящие соединения туда идут только через SSH (22/TCP, обычно открыт по умолчанию).
+
+> **Cloud.ru:** по умолчанию все входящие порты закрыты. В веб-интерфейсе перейдите в раздел «Группы безопасности», создайте новую группу и добавьте правила входящего трафика (ingress) для портов **443/TCP** и **80/TCP** с источником `0.0.0.0/0`. Затем привяжите эту группу к виртуальной машине. Применение правил может занять несколько минут.
+
+### Шаг 0б. Клонировать репозиторий на оба сервера
+
+Все конфиги нужны на каждом сервере. Клонируйте в `/opt`:
 
 ```bash
-sudo apt-get install -y nginx
+# На entry-сервере И на exit-сервере
+cd /opt
+git clone https://github.com/pohape/telegram-ru-proxy.git
 ```
 
-Разместить HTML-страницу в `/var/www/html/index.html` (любой правдоподобный контент).
+---
 
-Скопировать `configs/stealth/exit-server/nginx-fallback.conf` в `/etc/nginx/sites-available/fallback`. Заменить `server_name` и пути к сертификатам.
+## Entry-сервер (Россия)
+
+### Шаг 1. Сгенерировать SSH-ключ для подключения к exit-серверу
+
+Этот ключ используется autossh чтобы держать SSH-туннель без пароля.
 
 ```bash
-sudo ln -sf /etc/nginx/sites-available/fallback /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
+# На entry-сервере
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N '' -C 'entry->exit tunnel'
 ```
 
-#### mtprotoproxy
-
-Скопировать `configs/stealth/exit-server/config.py` в `/opt/mtprotoproxy/config.py`, вписать секрет и домен.
-
-Скопировать `configs/stealth/exit-server/mtprotoproxy.service` в `/etc/systemd/system/mtprotoproxy.service`.
+### Шаг 2. Скопировать публичный ключ на exit-сервер
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now mtprotoproxy
+ssh-copy-id -i ~/.ssh/id_ed25519.pub root@<EXIT_SERVER_IP>
+# Вместо root — ваш пользователь на exit-сервере, если он другой
 ```
 
-### Конфигурация entry-сервера
-
-#### Сертификат Let's Encrypt
+### Шаг 3. Настроить SSH-алиас для удобства
 
 ```bash
-sudo apt-get install -y certbot
+EXIT_IP=203.0.113.5   # ← замените на IP вашего exit-сервера
 
-# Порт 80 должен быть открыт и свободен
-sudo certbot certonly --standalone -d your-entry-server.example.com \
+cat >> ~/.ssh/config << EOF
+
+Host exit-server
+    HostName $EXIT_IP
+    User root
+    Port 22
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+    ServerAliveInterval 30
+    ServerAliveCountMax 3
+EOF
+chmod 600 ~/.ssh/config
+```
+
+> Если SSH на exit-сервере слушает на нестандартном порту (некоторые хостеры так делают) — замените `Port 22` на реальный порт. Если вы использовали в шаге 2 не `root`, а другого пользователя — замените `User root`.
+
+Проверьте подключение:
+```bash
+ssh exit-server hostname
+```
+
+Должно вывести hostname exit-сервера без запроса пароля.
+
+### Шаг 4. Установить certbot и autossh
+
+```bash
+apt-get update
+apt-get install -y certbot autossh dnsutils
+```
+
+`dnsutils` нужен только ради `dig` в шаге 5 — если он вам не нужен, можно не ставить.
+
+### Шаг 5. Выпустить SSL-сертификат Let's Encrypt
+
+Порт **80** должен быть открыт (см. Шаг 0а) и свободен — никакие веб-серверы не должны висеть на нём.
+
+Сначала убедитесь что DNS уже распространился — A-запись должна возвращать IP entry-сервера:
+
+```bash
+dig +short your-entry-server.example.com
+# должен вернуть IP entry-сервера; если нет — подождите несколько минут
+```
+
+Затем выпустите сертификат:
+
+```bash
+certbot certonly --standalone -d your-entry-server.example.com \
     --non-interactive --agree-tos -m your@email.com
 ```
 
-Скопировать сертификат на exit-сервер:
+Замените `your-entry-server.example.com` и email на свои. После успешного выпуска сертификат окажется в `/etc/letsencrypt/live/your-entry-server.example.com/`.
+
+### Шаг 6. Скопировать сертификат на exit-сервер
 
 ```bash
-scp /etc/letsencrypt/live/<DOMAIN>/fullchain.pem user@<EXIT_IP>:/tmp/entry-server_fullchain.pem
-scp /etc/letsencrypt/live/<DOMAIN>/privkey.pem user@<EXIT_IP>:/tmp/entry-server_privkey.pem
-ssh user@<EXIT_IP> "sudo mv /tmp/entry-server_fullchain.pem /etc/ssl/ && \
-    sudo mv /tmp/entry-server_privkey.pem /etc/ssl/ && \
-    sudo chmod 600 /etc/ssl/entry-server_privkey.pem && \
-    sudo systemctl reload nginx"
+DOMAIN=your-entry-server.example.com   # ← замените на ваш домен
+scp /etc/letsencrypt/live/$DOMAIN/fullchain.pem exit-server:/etc/ssl/entry-server_fullchain.pem
+scp /etc/letsencrypt/live/$DOMAIN/privkey.pem exit-server:/etc/ssl/entry-server_privkey.pem
+ssh exit-server "chmod 600 /etc/ssl/entry-server_privkey.pem"
 ```
 
-#### Автопродление сертификата
-
-Скопировать `configs/stealth/entry-server/renew-cert.sh` в `/usr/local/bin/renew-cert.sh`, заменить переменные.
+### Шаг 7. Настроить автопродление сертификата
 
 ```bash
-sudo chmod +x /usr/local/bin/renew-cert.sh
+cp /opt/telegram-ru-proxy/configs/entry-server/renew-cert.sh /usr/local/bin/renew-cert.sh
+chmod +x /usr/local/bin/renew-cert.sh
+```
+
+Откройте `/usr/local/bin/renew-cert.sh` в редакторе и замените 4 переменные в начале файла:
+
+- `DOMAIN` — ваш домен (например `your-entry-server.example.com`)
+- `SSH_KEY` — путь к приватному SSH-ключу (обычно `/root/.ssh/id_ed25519`)
+- `EXIT_USER` — пользователь на exit-сервере (обычно `root`)
+- `EXIT_IP` — IP exit-сервера
+
+Добавьте cron-запись (продление раз в 2 месяца, 1-го числа в 03:00):
+```bash
 echo '0 3 1 */2 * root /usr/local/bin/renew-cert.sh >> /var/log/renew-cert.log 2>&1' \
-    | sudo tee /etc/cron.d/renew-cert
+    | tee /etc/cron.d/renew-cert
 ```
 
-#### SSH-туннель
-
-Скопировать `configs/stealth/entry-server/ssh-tunnel-mtproto.service` в `/etc/systemd/system/ssh-tunnel-mtproto.service`. Заменить `User=user1` и `exit-server`.
+### Шаг 8. Настроить SSH-туннель через systemd
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now ssh-tunnel-mtproto
+cp /opt/telegram-ru-proxy/configs/entry-server/ssh-tunnel-mtproto.service \
+    /etc/systemd/system/ssh-tunnel-mtproto.service
 ```
 
-### Открыть порты
+Откройте `/etc/systemd/system/ssh-tunnel-mtproto.service` в редакторе:
 
-Открыть на entry-сервере в панели управления хостингом (security group, файрвол и т.д.):
-- **443/TCP** — для клиентов и HTTPS
-- **80/TCP** — для выпуска и продления сертификата Let's Encrypt
+- Если у вас есть отдельный пользователь — замените `User=user1` на него.
+- Если вы работаете под root и больше никого нет — замените на `User=root` (или просто удалите эту строку — systemd по умолчанию запустит от root).
+- Замените `exit-server` на имя хоста из SSH-конфига, если вы его называли иначе.
 
-> **Cloud.ru:** по умолчанию все входящие порты закрыты. Необходимо в веб-интерфейсе перейти в раздел «Группы безопасности», создать новую группу и добавить правила входящего трафика (ingress) для портов **443/TCP** и **80/TCP** с источником `0.0.0.0/0`. Затем привязать эту группу к виртуальной машине. Применение правил может занять несколько минут.
+Запустите и включите автозагрузку:
+```bash
+systemctl daemon-reload
+systemctl enable --now ssh-tunnel-mtproto
+systemctl status ssh-tunnel-mtproto
+```
 
-### Проверить
+Проверьте что порт 443 слушает:
+```bash
+ss -tlnp | grep ':443 '
+```
+
+> На этом этапе туннель стоит, но на exit-сервере ещё не настроен mtg (это шаги 9–15). Если сейчас откроете `https://your-entry-server.example.com` в браузере — получите ошибку «connection reset». Это нормально, всё заработает после экспорта сертификата в шаге 6 и настройки nginx+mtg.
+
+---
+
+## Exit-сервер (за рубежом)
+
+### Шаг 9. Установить nginx
+
+```bash
+apt-get update
+apt-get install -y nginx
+```
+
+### Шаг 10. Разместить сайт-заглушку
+
+В репо лежит готовый шаблон. Скопируйте его:
+
+```bash
+cp /opt/telegram-ru-proxy/configs/exit-server/index.html /var/www/html/index.html
+```
+
+Откройте `/var/www/html/index.html` и отредактируйте содержимое — замените заголовок «Мои любимые рецепты» и сами рецепты на что-нибудь ваше. Главное чтобы сайт выглядел как настоящий личный блог/визитка, а не как свежий сервер с `It works!`.
+
+### Шаг 11. Настроить nginx vhost
+
+```bash
+cp /opt/telegram-ru-proxy/configs/exit-server/nginx-fallback.conf \
+    /etc/nginx/sites-available/fallback
+```
+
+Откройте `/etc/nginx/sites-available/fallback` и замените **только `server_name`** на ваш домен. Пути к сертификатам в шаблоне (`/etc/ssl/entry-server_fullchain.pem` и `/etc/ssl/entry-server_privkey.pem`) уже совпадают с тем, куда вы скопировали их в шаге 6 — менять не надо.
+
+```bash
+ln -sf /etc/nginx/sites-available/fallback /etc/nginx/sites-enabled/
+nginx -t
+systemctl reload nginx
+systemctl enable nginx
+```
+
+`nginx -t` должен вернуть «syntax is ok» — если ругается на отсутствующий сертификат, значит вы пропустили шаг 6.
+
+### Шаг 12. Установить mtg
+
+Скачайте последний релиз [mtg](https://github.com/9seconds/mtg/releases) под Linux amd64:
+
+```bash
+# Замените MTG_VERSION на актуальную версию с https://github.com/9seconds/mtg/releases
+MTG_VERSION=2.2.8
+curl -sL "https://github.com/9seconds/mtg/releases/download/v${MTG_VERSION}/mtg-${MTG_VERSION}-linux-amd64.tar.gz" \
+    | tar xz --strip-components=1 -C /tmp
+mv /tmp/mtg /usr/local/bin/mtg
+chmod +x /usr/local/bin/mtg
+mtg --version
+```
+
+### Шаг 13. Сгенерировать секрет
+
+```bash
+mtg generate-secret your-entry-server.example.com
+```
+
+Замените домен на ваш. На выходе получите строку вида `7lVloOMidgDyMRGpZZaPezRtb3Njb3cyLmdldmV5bGVyLnJ1` — это полный секрет в base64. **Сохраните его** — он пойдёт и в конфиг mtg, и в ссылку `tg://proxy?...&secret=...` для клиентов.
+
+> Всегда подставляйте в `generate-secret` **домен вашего entry-сервера**, а не чужой (`google.com` и подобные). Домен зашит внутри секрета и используется как SNI при TLS-подключении. Если SNI = `google.com`, а IP-адрес сервера принадлежит Cloud.ru или Beget — DPI это легко палит.
+
+### Шаг 14. Настроить mtg
+
+```bash
+cp /opt/telegram-ru-proxy/configs/exit-server/mtg.toml /etc/mtg.toml
+```
+
+Откройте `/etc/mtg.toml` и замените `YOUR_SECRET_HERE` на секрет из шага 13.
+
+В конфиге также настроена секция `[domain-fronting]` с `ip = "127.0.0.1"` и `port = 8080` — это заставляет mtg отправлять не-MTProto подключения на локальный nginx (иначе mtg резолвит домен из секрета через DNS, попадает обратно на entry-сервер — получается петля).
+
+### Шаг 15. Запустить mtg через systemd
+
+```bash
+cp /opt/telegram-ru-proxy/configs/exit-server/mtg.service /etc/systemd/system/mtg.service
+systemctl daemon-reload
+systemctl enable --now mtg
+systemctl status mtg
+```
+
+---
+
+## Проверить
+
+**С внешней машины:**
 
 ```bash
 # Порт доступен
-nc -zv <ENTRY_SERVER_IP> 443
+nc -zv your-entry-server.example.com 443
 
-# Сайт-заглушка работает через всю цепочку
-curl -sk https://your-entry-server.example.com | head
+# Сайт-заглушка открывается через всю цепочку
+curl -sk https://your-entry-server.example.com | grep '<title>'
 ```
+
+**На exit-сервере (диагностика mtg):**
+
+```bash
+mtg doctor /etc/mtg.toml
+```
+
+Проверяет валидность конфига, расхождение времени, доступность серверов Telegram, достижимость fronting-домена. В двухсерверной схеме SNI-DNS-mismatch (красная галочка про SNI) — **ожидаемо**: домен указывает на entry-сервер, а mtg крутится на exit-сервере. Это не ошибка, всё остальное должно быть зелёное.
+
+**MTProto-проверка через наш скрипт (с любой машины):**
+
+```bash
+python3 /opt/telegram-ru-proxy/check_mtproto_proxy.py "tg://proxy?server=your-entry-server.example.com&port=443&secret=ВАШ_СЕКРЕТ"
+```
+
+Должно вывести `OK`. Если `Server response digest does not match expected HMAC` — значит прокси не распознал секрет и отправил вас на fallback-сайт (например, секрет в ссылке не совпадает с `/etc/mtg.toml`).
 
 ---
 
@@ -270,10 +326,7 @@ curl -sk https://your-entry-server.example.com | head
 tg://proxy?server=<ДОМЕН_ENTRY_СЕРВЕРА>&port=443&secret=<СЕКРЕТ>
 ```
 
-Секрет для ссылки формируется из hex-секрета в config.py:
-```
-ee<hex-секрет-из-config.py><hex-домена>
-```
+`<СЕКРЕТ>` — это та самая строка, которую вывел `mtg generate-secret <домен>` (в формате base64). В ссылку подставляется **точно как есть**, без дополнительного кодирования.
 
 Или вручную: Настройки → Данные и хранилище → Прокси → Добавить прокси:
 
@@ -282,33 +335,51 @@ ee<hex-секрет-из-config.py><hex-домена>
 - **Порт:** `443`
 - **Секрет:** `<СЕКРЕТ>`
 
+---
+
 ## Обслуживание
 
 ```bash
 # Статус (entry-сервер)
-sudo systemctl status ssh-tunnel-mtproto
+systemctl status ssh-tunnel-mtproto
 
 # Статус (exit-сервер)
-sudo systemctl status mtprotoproxy
+systemctl status mtg
 
 # Логи
-sudo journalctl -u ssh-tunnel-mtproto -f    # entry
-sudo journalctl -u mtprotoproxy -f           # exit
+journalctl -u ssh-tunnel-mtproto -f    # entry
+journalctl -u mtg -f                    # exit
 
 # Перезапуск
-sudo systemctl restart ssh-tunnel-mtproto   # entry
-sudo systemctl restart mtprotoproxy          # exit
+systemctl restart ssh-tunnel-mtproto   # entry
+systemctl restart mtg                   # exit
+```
+
+### Обновление mtg
+
+mtg обновляется часто — полезно следить за новыми релизами и обновляться, особенно если в changelog упомянуты фиксы DPI.
+
+```bash
+# На exit-сервере
+MTG_VERSION=2.2.8  # ← заменить на актуальную версию с https://github.com/9seconds/mtg/releases
+curl -sL "https://github.com/9seconds/mtg/releases/download/v${MTG_VERSION}/mtg-${MTG_VERSION}-linux-amd64.tar.gz" | tar xz --strip-components=1 -C /tmp
+mv /tmp/mtg /usr/local/bin/mtg
+chmod +x /usr/local/bin/mtg
+systemctl restart mtg
+mtg --version
 ```
 
 ### Смена секрета
 
 ```bash
 # На exit-сервере
-python3 -c "import secrets; print(secrets.token_hex(16))"
-# Вписать новый секрет в /opt/mtprotoproxy/config.py
-sudo systemctl restart mtprotoproxy
+mtg generate-secret your-entry-server.example.com
+# Вписать новый секрет в /etc/mtg.toml
+systemctl restart mtg
 # Обновить ссылку tg://proxy у клиентов
 ```
+
+---
 
 ## Устойчивость к перезагрузкам
 
@@ -317,8 +388,10 @@ sudo systemctl restart mtprotoproxy
 | Сценарий | Поведение |
 |----------|-----------|
 | Перезагрузка entry-сервера | autossh стартует автоматически, поднимает туннель |
-| Перезагрузка exit-сервера | mtprotoproxy стартует автоматически. autossh на entry переподключится в течение 30 сек |
+| Перезагрузка exit-сервера | mtg и nginx стартуют автоматически. autossh на entry переподключится в течение 30 сек |
 | Оба сервера одновременно | Каждый поднимет свои сервисы. autossh будет пытаться подключиться пока exit-сервер не станет доступен |
+
+---
 
 ## Мониторинг
 
@@ -328,24 +401,18 @@ sudo systemctl restart mtprotoproxy
 
 Скрипт выполняет настоящий FakeTLS handshake, как это делает Telegram-клиент:
 
-1. Формирует TLS 1.3 ClientHello со структурой, которую ждёт mtg / mtprotoproxy (длина ≥ 517 байт, TLS record version `0x0301`, SNI с доменом из секрета).
+1. Формирует TLS 1.3 ClientHello со структурой, которую ждёт mtg (длина ≥ 517 байт, TLS record version `0x0301`, SNI с доменом из секрета).
 2. Вычисляет 32-байтный `HMAC-SHA256(секрет, ClientHello с зануленным random-полем)`, XOR-ит последние 4 байта с текущим unix-временем и подставляет результат в поле random.
 3. Отправляет ClientHello на сервер и читает ответ.
 4. Извлекает из ответа 32-байтный серверный digest (поле `random` в ServerHello).
 5. Вычисляет ожидаемое значение: `HMAC-SHA256(секрет, клиентский_digest + ServerHello_с_зануленным_digest)`.
 6. Сравнивает. Совпадение = сервер знает секрет и корректно обслужил MTProto-клиента. Несовпадение = запрос ушёл в domain fronting (fallback), то есть прокси не узнал клиента.
 
-За счёт HMAC-проверки скрипт отличает работающий MTProto-проксик от «мёртвого» прокси, который просто показывает сайт-заглушку любому входящему.
-
-### Совместимость
-
-- ✅ **mtg** (FakeTLS mode) — единственный режим, который поддерживает mtg
-- ✅ **mtprotoproxy** с `tls: True` в `config.py`
-- ❌ Старые режимы (`classic`, `secure`/dd-secret) — у FakeTLS-проверки другая логика handshake
+За счёт HMAC-проверки скрипт отличает работающий MTProto-прокси от «мёртвого» прокси, который просто показывает сайт-заглушку любому входящему.
 
 ### Зависимости
 
-Только стандартная библиотека Python 3 (`hmac`, `hashlib`, `socket`, `struct`, `secrets`, `base64`, `urllib`, `argparse`). Никаких `pip install` не требуется, не нужно `api_id`/`api_hash` и аккаунт Telegram.
+Только стандартная библиотека Python 3 (`hmac`, `hashlib`, `socket`, `struct`, `secrets`, `base64`, `urllib`, `argparse`).
 
 ### Использование
 
@@ -378,7 +445,7 @@ python3 check_mtproto_proxy.py "tg://proxy?server=...&port=...&secret=..."
 ```yaml
 commands:
   mtproto_proxy_1:
-    command: "python3 /path/to/check_mtproto_proxy.py 'tg://proxy?server=your-server.example.com&port=443&secret=YOUR_SECRET'"
+    command: "python3 /opt/telegram-ru-proxy/check_mtproto_proxy.py 'tg://proxy?server=your-server.example.com&port=443&secret=YOUR_SECRET'"
     search_string: "OK"
     timeout: 15
     schedule: '*/5 * * * *'
@@ -391,27 +458,21 @@ commands:
 
 > 🇷🇺 Если мониторинг крутится в России и провайдер блокирует `api.telegram.org` — настройте в монитор-тулзе опцию `telegram_proxy` (SOCKS5 через SSH-туннель). См. его README, секция «Telegram Proxy».
 
+---
+
 ## Структура проекта
 
 ```
 telegram-ru-proxy/
 ├── README.md
-├── check_mtproto_proxy.py           # Скрипт мониторинга (end-to-end проверка)
+├── check_mtproto_proxy.py               # Скрипт мониторинга (FakeTLS handshake)
 └── configs/
-    ├── simple/                          # Способ 1: простой
-    │   ├── entry-server/
-    │   │   ├── ssh-tunnel-mtproto.service
-    │   │   └── ssh-config
-    │   └── exit-server/
-    │       ├── mtprotoproxy.service
-    │       └── config.py
-    └── stealth/                             # Способ 2: с маскировкой
-        ├── entry-server/
-        │   ├── ssh-tunnel-mtproto.service
-        │   ├── ssh-config
-        │   └── renew-cert.sh
-        └── exit-server/
-            ├── mtprotoproxy.service
-            ├── config.py
-            └── nginx-fallback.conf
+    ├── entry-server/
+    │   ├── ssh-tunnel-mtproto.service   # systemd-юнит SSH-туннеля
+    │   └── renew-cert.sh                # скрипт продления сертификата
+    └── exit-server/
+        ├── mtg.toml                     # конфиг mtg
+        ├── mtg.service                  # systemd-юнит mtg
+        ├── nginx-fallback.conf          # nginx vhost для сайта-заглушки
+        └── index.html                   # шаблон сайта-заглушки (рецепты)
 ```

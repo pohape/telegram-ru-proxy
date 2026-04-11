@@ -1,0 +1,22 @@
+# mtg config с маскировкой (exit-сервер, stealth способ)
+# https://github.com/9seconds/mtg
+#
+# Слушает только на localhost — доступ снаружи только через SSH-туннель
+# с entry-сервера. Telegram-клиенты проходят FakeTLS handshake и идут
+# в Telegram. Не-MTProto подключения (браузер, проверка РКН) перенаправляются
+# на локальный nginx по [domain-fronting] — там отдаётся сайт-заглушка.
+
+# Секрет генерируется на exit-сервере командой:
+#   mtg generate-secret <домен-вашего-entry-сервера>
+# Например:
+#   mtg generate-secret your-entry-server.example.com
+secret = "YOUR_SECRET_HERE"
+
+bind-to = "127.0.0.1:3443"
+
+# Fallback: не-MTProto клиенты (браузер, РКН) идут на локальный nginx.
+# ip = "127.0.0.1" чтобы избежать петли — иначе mtg резолвит домен из секрета
+# через DNS, получает IP entry-сервера и лезет обратно к себе.
+[domain-fronting]
+ip = "127.0.0.1"
+port = 8080
