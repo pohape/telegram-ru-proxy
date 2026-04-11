@@ -176,7 +176,7 @@ chmod +x /usr/local/bin/renew-cert.sh
 Добавьте cron-запись (продление раз в 2 месяца, 1-го числа в 03:00):
 ```bash
 echo '0 3 1 */2 * root /usr/local/bin/renew-cert.sh >> /var/log/renew-cert.log 2>&1' \
-    | tee /etc/cron.d/renew-cert
+    | tee /etc/cron.d/renew-cert > /dev/null
 ```
 
 ### Шаг 8. Настроить SSH-туннель через systemd
@@ -204,11 +204,18 @@ systemctl status ssh-tunnel-mtproto
 ss -tlnp | grep ':443 '
 ```
 
-> На этом этапе туннель стоит, но на exit-сервере ещё не настроен mtg (это шаги 9–15). Если сейчас откроете `https://your-entry-server.example.com` в браузере — получите ошибку «connection reset». Это нормально, всё заработает после экспорта сертификата в шаге 6 и настройки nginx+mtg.
+> На этом этапе туннель стоит, но на exit-сервере ещё не настроен mtg (это шаги 9–15). Если сейчас откроете `https://your-entry-server.example.com` в браузере — получите ошибку «connection reset». Это нормально, всё заработает после настройки nginx+mtg в шагах 9–15.
 
 ---
 
 ## Exit-сервер (за рубежом)
+
+Теперь переключитесь на exit-сервер:
+
+```bash
+# С entry-сервера
+ssh exit-server
+```
 
 ### Шаг 9. Установить nginx
 
