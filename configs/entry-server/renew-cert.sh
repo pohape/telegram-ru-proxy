@@ -8,7 +8,7 @@
 #   EXIT_USER — пользователь на exit-сервере
 #   EXIT_IP — IP exit-сервера
 
-DOMAIN="your-entry-server.example.com"
+DOMAIN="entry.example.ru"
 SSH_KEY="/root/.ssh/id_ed25519"
 EXIT_USER="root"
 EXIT_IP="<EXIT_SERVER_IP>"

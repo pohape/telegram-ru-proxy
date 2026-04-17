@@ -148,25 +148,25 @@ ssh exit-server hostname
 Сначала убедитесь что DNS уже распространился — A-запись должна возвращать IP entry-сервера:
 
 ```bash
-dig +short your-entry-server.example.com
+dig +short entry.example.ru
 # должен вернуть IP entry-сервера; если нет — подождите несколько минут
 ```
 
 Затем выпустите сертификат:
 
 ```bash
-certbot certonly --standalone -d your-entry-server.example.com \
+certbot certonly --standalone -d entry.example.ru \
     --non-interactive --agree-tos -m your@email.com
 ```
 
-Замените `your-entry-server.example.com` и email на свои. После успешного выпуска сертификат окажется в `/etc/letsencrypt/live/your-entry-server.example.com/`.
+Замените `entry.example.ru` и email на свои. После успешного выпуска сертификат окажется в `/etc/letsencrypt/live/entry.example.ru/`.
 
 ### Шаг 5. Скопировать сертификат на exit-сервер
 
 Копируем сначала в `/tmp` (туда может писать любой пользователь), потом `sudo mv` в `/etc/ssl/`. Такая схема работает и для root, и для non-root пользователя с passwordless sudo (типичный дефолт на Tencent / AWS / Hetzner).
 
 ```bash
-DOMAIN=your-entry-server.example.com   # ← замените на ваш домен
+DOMAIN=entry.example.ru   # ← замените на ваш домен
 scp /etc/letsencrypt/live/$DOMAIN/fullchain.pem exit-server:/tmp/entry-server_fullchain.pem
 scp /etc/letsencrypt/live/$DOMAIN/privkey.pem exit-server:/tmp/entry-server_privkey.pem
 ssh exit-server "sudo mv /tmp/entry-server_fullchain.pem /etc/ssl/ && \
@@ -183,7 +183,7 @@ chmod +x /usr/local/bin/renew-cert.sh
 
 Откройте `/usr/local/bin/renew-cert.sh` в редакторе и замените 4 переменные в начале файла:
 
-- `DOMAIN` — ваш домен (например `your-entry-server.example.com`)
+- `DOMAIN` — ваш домен (например `entry.example.ru`)
 - `SSH_KEY` — путь к приватному SSH-ключу (обычно `/root/.ssh/id_ed25519`)
 - `EXIT_USER` — пользователь на exit-сервере (тот же, что вы использовали в Шаге 2)
 - `EXIT_IP` — IP exit-сервера
@@ -219,7 +219,7 @@ systemctl status ssh-tunnel-mtproto
 ss -tlnp | grep ':443 '
 ```
 
-> На этом этапе туннель стоит, но на exit-сервере ещё не настроен mtg (это шаги 8–13). Если сейчас откроете `https://your-entry-server.example.com` в браузере — получите ошибку «connection reset». Это нормально, всё заработает после настройки nginx+mtg в шагах 8–13.
+> На этом этапе туннель стоит, но на exit-сервере ещё не настроен mtg (это шаги 8–13). Если сейчас откроете `https://entry.example.ru` в браузере — получите ошибку «connection reset». Это нормально, всё заработает после настройки nginx+mtg в шагах 8–13.
 
 ---
 
@@ -277,10 +277,10 @@ mtg --version
 ### Шаг 11. Сгенерировать секрет
 
 ```bash
-mtg generate-secret your-entry-server.example.com
+mtg generate-secret entry.example.ru
 ```
 
-Замените домен на ваш. На выходе получите строку вида `7lVloOMidgDyMRGpZZaPezRtb3Njb3cyLmdldmV5bGVyLnJ1` — это полный секрет в base64. **Сохраните его** — он пойдёт и в конфиг mtg, и в ссылку `tg://proxy?...&secret=...` для клиентов.
+Замените домен на ваш. На выходе получите строку вида `7iem4kIaSCdUXV/geqhhNHRlbnRyeS5leGFtcGxlLnJ1` — это полный секрет в base64. **Сохраните его** — он пойдёт и в конфиг mtg, и в ссылку `tg://proxy?...&secret=...` для клиентов.
 
 > Всегда подставляйте в `generate-secret` **домен вашего entry-сервера**, а не чужой (`google.com` и подобные). Домен зашит внутри секрета и используется как SNI при TLS-подключении. Если SNI = `google.com`, а IP-адрес сервера принадлежит Cloud.ru или Beget — DPI это легко палит.
 
@@ -311,10 +311,10 @@ systemctl status mtg
 
 ```bash
 # Порт доступен
-nc -zv your-entry-server.example.com 443
+nc -zv entry.example.ru 443
 
 # Сайт-заглушка открывается через всю цепочку
-curl -sk https://your-entry-server.example.com | grep '<title>'
+curl -sk https://entry.example.ru | grep '<title>'
 ```
 
 **На exit-сервере (диагностика mtg):**
@@ -328,7 +328,7 @@ mtg doctor /etc/mtg.toml
 **MTProto-проверка через наш скрипт (с любой машины):**
 
 ```bash
-python3 /opt/telegram-ru-proxy/check_mtproto_proxy.py "tg://proxy?server=your-entry-server.example.com&port=443&secret=ВАШ_СЕКРЕТ"
+python3 /opt/telegram-ru-proxy/check_mtproto_proxy.py "tg://proxy?server=entry.example.ru&port=443&secret=ВАШ_СЕКРЕТ"
 ```
 
 Должно вывести `OK`. Если `Server response digest does not match expected HMAC` — значит прокси не распознал секрет и отправил вас на fallback-сайт (например, секрет в ссылке не совпадает с `/etc/mtg.toml`).
@@ -388,7 +388,7 @@ mtg --version
 
 ```bash
 # На exit-сервере
-mtg generate-secret your-entry-server.example.com
+mtg generate-secret entry.example.ru
 # Вписать новый секрет в /etc/mtg.toml
 systemctl restart mtg
 # Обновить ссылку tg://proxy у клиентов
@@ -460,7 +460,7 @@ python3 check_mtproto_proxy.py "tg://proxy?server=...&port=...&secret=..."
 ```yaml
 commands:
   mtproto_proxy_1:
-    command: "python3 /opt/telegram-ru-proxy/check_mtproto_proxy.py 'tg://proxy?server=your-server.example.com&port=443&secret=YOUR_SECRET'"
+    command: "python3 /opt/telegram-ru-proxy/check_mtproto_proxy.py 'tg://proxy?server=your-server.example.ru&port=443&secret=YOUR_SECRET'"
     search_string: "OK"
     timeout: 15
     schedule: '*/5 * * * *'

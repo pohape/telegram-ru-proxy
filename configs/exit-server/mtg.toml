@@ -9,7 +9,7 @@
 # Секрет генерируется на exit-сервере командой:
 #   mtg generate-secret <домен-вашего-entry-сервера>
 # Например:
-#   mtg generate-secret your-entry-server.example.com
+#   mtg generate-secret entry.example.ru
 secret = "YOUR_SECRET_HERE"
 
 bind-to = "127.0.0.1:3443"
