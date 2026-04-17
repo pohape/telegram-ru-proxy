@@ -106,19 +106,23 @@ ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N '' -C 'entry->exit tunnel'
 
 ```bash
 ssh-copy-id -i ~/.ssh/id_ed25519.pub root@<EXIT_SERVER_IP>
-# Вместо root — ваш пользователь на exit-сервере, если он другой
 ```
+
+> **Важно про имя пользователя.** Многие cloud-провайдеры (Tencent Lighthouse, AWS, Hetzner Cloud) по умолчанию **запрещают** SSH от root и создают для вас готового пользователя — чаще всего `ubuntu`, иногда `debian` или `ec2-user`. Если `ssh-copy-id root@...` падает с «Permission denied» — подставьте имя пользователя вашего провайдера: `ssh-copy-id ubuntu@...`. Уточнить дефолтного юзера можно в панели хостера или в документации образа.
+>
+> Это имя пользователя нужно будет запомнить — оно попадёт в SSH-конфиг (Шаг 3), в scp-команды (Шаг 5) и в `renew-cert.sh` (Шаг 6).
 
 ### Шаг 3. Настроить SSH-алиас для удобства
 
 ```bash
-EXIT_IP=203.0.113.5   # ← замените на IP вашего exit-сервера
+EXIT_IP=203.0.113.5      # ← замените на IP вашего exit-сервера
+EXIT_USER=root           # ← замените на пользователя с Шага 2 (часто ubuntu, debian и т.п.)
 
 cat >> ~/.ssh/config << EOF
 
 Host exit-server
     HostName $EXIT_IP
-    User root
+    User $EXIT_USER
     Port 22
     IdentityFile ~/.ssh/id_ed25519
     IdentitiesOnly yes
@@ -128,7 +132,7 @@ EOF
 chmod 600 ~/.ssh/config
 ```
 
-> Если SSH на exit-сервере слушает на нестандартном порту (некоторые хостеры так делают) — замените `Port 22` на реальный порт. Если вы использовали в шаге 2 не `root`, а другого пользователя — замените `User root`.
+> Если SSH на exit-сервере слушает на нестандартном порту (некоторые хостеры так делают) — замените `Port 22` на реальный порт.
 
 Проверьте подключение:
 ```bash
@@ -159,11 +163,15 @@ certbot certonly --standalone -d your-entry-server.example.com \
 
 ### Шаг 5. Скопировать сертификат на exit-сервер
 
+Копируем сначала в `/tmp` (туда может писать любой пользователь), потом `sudo mv` в `/etc/ssl/`. Такая схема работает и для root, и для non-root пользователя с passwordless sudo (типичный дефолт на Tencent / AWS / Hetzner).
+
 ```bash
 DOMAIN=your-entry-server.example.com   # ← замените на ваш домен
-scp /etc/letsencrypt/live/$DOMAIN/fullchain.pem exit-server:/etc/ssl/entry-server_fullchain.pem
-scp /etc/letsencrypt/live/$DOMAIN/privkey.pem exit-server:/etc/ssl/entry-server_privkey.pem
-ssh exit-server "chmod 600 /etc/ssl/entry-server_privkey.pem"
+scp /etc/letsencrypt/live/$DOMAIN/fullchain.pem exit-server:/tmp/entry-server_fullchain.pem
+scp /etc/letsencrypt/live/$DOMAIN/privkey.pem exit-server:/tmp/entry-server_privkey.pem
+ssh exit-server "sudo mv /tmp/entry-server_fullchain.pem /etc/ssl/ && \
+                 sudo mv /tmp/entry-server_privkey.pem /etc/ssl/ && \
+                 sudo chmod 600 /etc/ssl/entry-server_privkey.pem"
 ```
 
 ### Шаг 6. Настроить автопродление сертификата
@@ -177,7 +185,7 @@ chmod +x /usr/local/bin/renew-cert.sh
 
 - `DOMAIN` — ваш домен (например `your-entry-server.example.com`)
 - `SSH_KEY` — путь к приватному SSH-ключу (обычно `/root/.ssh/id_ed25519`)
-- `EXIT_USER` — пользователь на exit-сервере (обычно `root`)
+- `EXIT_USER` — пользователь на exit-сервере (тот же, что вы использовали в Шаге 2)
 - `EXIT_IP` — IP exit-сервера
 
 Добавьте cron-запись (продление раз в 2 месяца, 1-го числа в 03:00):

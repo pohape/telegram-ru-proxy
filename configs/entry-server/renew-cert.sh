@@ -18,9 +18,13 @@ certbot renew --quiet --standalone \
     --pre-hook "systemctl stop ssh-tunnel-mtproto" \
     --post-hook "systemctl start ssh-tunnel-mtproto"
 
-# Копирование на exit-сервер
-scp -i "$SSH_KEY" "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" "$EXIT_USER@$EXIT_IP:/etc/ssl/entry-server_fullchain.pem"
-scp -i "$SSH_KEY" "/etc/letsencrypt/live/$DOMAIN/privkey.pem" "$EXIT_USER@$EXIT_IP:/etc/ssl/entry-server_privkey.pem"
+# Копирование на exit-сервер: сначала в /tmp (доступно на запись любому юзеру),
+# потом mv через sudo в /etc/ssl/. Работает и для root, и для non-root пользователя
+# с passwordless sudo (типичный дефолт на Tencent / AWS / Hetzner).
+scp -i "$SSH_KEY" "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" "$EXIT_USER@$EXIT_IP:/tmp/entry-server_fullchain.pem"
+scp -i "$SSH_KEY" "/etc/letsencrypt/live/$DOMAIN/privkey.pem" "$EXIT_USER@$EXIT_IP:/tmp/entry-server_privkey.pem"
 ssh -i "$SSH_KEY" "$EXIT_USER@$EXIT_IP" "\
-    chmod 600 /etc/ssl/entry-server_privkey.pem && \
-    systemctl reload nginx"
+    sudo mv /tmp/entry-server_fullchain.pem /etc/ssl/ && \
+    sudo mv /tmp/entry-server_privkey.pem /etc/ssl/ && \
+    sudo chmod 600 /etc/ssl/entry-server_privkey.pem && \
+    sudo systemctl reload nginx"
